@@ -46,7 +46,7 @@ async def start(message: types.Message):
     user = message.from_user
     await bot.send_photo(
         chat_id=message.chat.id,
-        photo="https://telegra.ph/file/ВАША_ССЫЛКА.jpg",  # 👈 ЗАМЕНИТЕ НА СВОЮ ССЫЛКУ
+        photo="https://i.ibb.co/R9tF1vF/photo-2026-02-07-13-19-23.jpg",  # 👈 ЗАМЕНИТЕ НА СВОЮ ССЫЛКУ
         caption="<b>Добро пожаловать!</b>\n\nЧтобы начать общение, нажмите кнопку ниже 👇",
         parse_mode="HTML",
         reply_markup=start_keyboard()
