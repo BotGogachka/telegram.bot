@@ -6,23 +6,18 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# ========== ТОКЕН ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8853421640
-# ===================================================
 
-# --- СОЗДАЕМ БОТА И ДИСПЕТЧЕР ---
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- КНОПКА "НАЧАТЬ ОБУЧЕНИЕ" ---
 def start_keyboard():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🚀 НАЧАТЬ ОБУЧЕНИЕ", callback_data="start_click")]
     ])
     return keyboard
 
-# --- ЧТО ПРОИСХОДИТ, КОГДА ПОЛЬЗОВАТЕЛЬ НАЖИМАЕТ КНОПКУ ---
 @dp.callback_query(lambda c: c.data == "start_click")
 async def process_start_button(callback_query: types.CallbackQuery):
     user = callback_query.from_user
@@ -40,14 +35,12 @@ async def process_start_button(callback_query: types.CallbackQuery):
         f"📛 Username: @{user.username if user.username else 'не указан'}"
     )
 
-# --- ПРИВЕТСТВИЕ С ФОТО ---
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user = message.from_user
-    await bot.send_photo(
+    await bot.send_message(
         chat_id=message.chat.id,
-        photo="https://i.imgur.com/5ktJslx.jpeg",  # 👈 ЗАМЕНИТЕ НА СВОЮ ССЫЛКУ
-        caption="<b>Добро пожаловать!</b>\n\nЧтобы начать общение, нажмите кнопку ниже 👇",
+        text="<b>Добро пожаловать!</b>\n\nЧтобы начать общение, нажмите кнопку ниже 👇",
         parse_mode="HTML",
         reply_markup=start_keyboard()
     )
@@ -59,7 +52,6 @@ async def start(message: types.Message):
         f"📛 Username: @{user.username if user.username else 'не указан'}"
     )
 
-# --- ПЕРЕСЫЛКА СООБЩЕНИЙ И ОТВЕТЫ ---
 last_user_id = None
 
 @dp.message()
@@ -124,11 +116,9 @@ async def handle_message(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
 
-# --- ЗАПУСК БОТА В ФОНОВОМ ПОТОКЕ ---
 def run_bot():
     asyncio.run(dp.start_polling(bot))
 
-# --- Flask ДЛЯ RENDER ---
 app = Flask(__name__)
 
 @app.route('/')
@@ -140,9 +130,10 @@ def health():
     return "OK"
 
 if __name__ == "__main__":
-    # Запускаем бота в фоновом потоке
-    thread = threading.Thread(target=run_bot)
-    thread.start()
-    # Запускаем веб-сервер для Render
+    # ЗАПУСКАЕМ БОТА В ОТДЕЛЬНОМ ПОТОКЕ
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    
+    # ЗАПУСКАЕМ Flask
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
