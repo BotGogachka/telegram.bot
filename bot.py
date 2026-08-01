@@ -1,0 +1,143 @@
+import asyncio
+import os  # 👈 ДОБАВЛЯЕМ для переменных окружения
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# ========== БЕРЕМ ДАННЫЕ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
+BOT_TOKEN = os.environ.get("BOT_TOKEN")  # 👈 ТОКЕН БЕРЕМ ИЗ ОКРУЖЕНИЯ!
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "8853421640"))  # 👈 ТОЖЕ ИЗ ОКРУЖЕНИЯ
+# ============================================================
+
+# Проверяем, что токен существует
+if not BOT_TOKEN:
+    raise ValueError("Токен бота не найден! Установите переменную окружения BOT_TOKEN")
+
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+# --- КНОПКА "НАЧАТЬ ОБУЧЕНИЕ" ---
+def start_keyboard():
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚀 НАЧАТЬ ОБУЧЕНИЕ", callback_data="start_click")]
+    ])
+    return keyboard
+
+# --- ЧТО ПРОИСХОДИТ, КОГДА ПОЛЬЗОВАТЕЛЬ НАЖИМАЕТ КНОПКУ ---
+@dp.callback_query(lambda c: c.data == "start_click")
+async def process_start_button(callback_query: types.CallbackQuery):
+    user = callback_query.from_user
+
+    await bot.answer_callback_query(callback_query.id)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        "Отлично! Начинаем погружение в мир анализа и заработка!\n\n"
+        "Теперь вы можете задать мне любой вопрос, и я отвечу вам как можно скорее."
+    )
+
+    await bot.send_message(
+        ADMIN_ID,
+        f"👤 Новый пользователь нажал кнопку 'НАЧАТЬ'!\n"
+        f"🆔 ID: {user.id}\n"
+        f"👤 Имя: {user.full_name}\n"
+        f"📛 Username: @{user.username if user.username else 'не указан'}"
+    )
+
+# --- ПРИВЕТСТВИЕ С ФОТО ---
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    user = message.from_user
+
+    # 👇 ПРЯМАЯ ССЫЛКА НА ФОТО (ЗАМЕНИТЕ НА ВАШУ)
+    photo_url = "https://i.ibb.co/sp0j5Hrq/your-image.jpg"  # или загрузите фото через Telegram и получите file_id
+    
+    # ОТПРАВЛЯЕМ ФОТО С ТЕКСТОМ И КНОПКОЙ
+    await bot.send_photo(
+        chat_id=message.chat.id,
+        photo=photo_url,  # 👈 ИСПРАВЛЕНО
+        caption="<b>Добро пожаловать!</b>\n\nЧтобы начать общение, нажмите кнопку ниже 👇",
+        parse_mode="HTML",
+        reply_markup=start_keyboard()
+    )
+
+    # Уведомление админу
+    await bot.send_message(
+        ADMIN_ID,
+        f"👤 Пользователь ввел команду /start\n"
+        f"🆔 ID: {user.id}\n"
+        f"👤 Имя: {user.full_name}\n"
+        f"📛 Username: @{user.username if user.username else 'не указан'}"
+    )
+
+# --- ПЕРЕСЫЛКА СООБЩЕНИЙ И ОТВЕТЫ ---
+last_user_id = None
+
+@dp.message()
+async def handle_message(message: types.Message):
+    global last_user_id
+    user_id = message.from_user.id
+
+    if user_id == ADMIN_ID:
+        if message.reply_to_message:
+            original = message.reply_to_message
+            target_user_id = None
+
+            if original.forward_from:
+                target_user_id = original.forward_from.id
+            elif original.forward_from_chat:
+                target_user_id = original.forward_from_chat.id
+            else:
+                import re
+                match = re.search(r"🆔 ID: (\d+)", original.text or "")
+                if match:
+                    target_user_id = int(match.group(1))
+                elif last_user_id:
+                    target_user_id = last_user_id
+
+            if target_user_id:
+                try:
+                    await bot.send_message(
+                        target_user_id,
+                        f"📩 Ответ от администратора:\n\n{message.text}"
+                    )
+                    await message.answer(f"✅ Ответ отправлен пользователю (ID: {target_user_id})")
+                except Exception as e:
+                    await message.answer(f"❌ Ошибка: {e}")
+            else:
+                await message.answer("❌ Не могу найти пользователя для ответа.")
+            return
+
+        if last_user_id:
+            try:
+                await bot.send_message(
+                    last_user_id,
+                    f"📩 Ответ от администратора:\n\n{message.text}"
+                )
+                await message.answer(f"✅ Ответ отправлен последнему пользователю (ID: {last_user_id})")
+            except Exception as e:
+                await message.answer(f"❌ Ошибка: {e}")
+        else:
+            await message.answer("ℹ️ Нет активных пользователей.")
+        return
+
+    last_user_id = user_id
+
+    try:
+        await bot.forward_message(ADMIN_ID, user_id, message.message_id)
+        await bot.send_message(
+            ADMIN_ID,
+            f"👤 Пользователь: {message.from_user.full_name}\n"
+            f"🆔 ID: {user_id}\n"
+            f"📝 Текст: {message.text or 'не текстовое сообщение'}"
+        )
+        await message.answer("✅ Ваше сообщение отправлено администратору!")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
+# --- ЗАПУСК ---
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
